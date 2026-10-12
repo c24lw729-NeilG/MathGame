@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>國二因式分解大冒險 Factorization Arcade</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;800&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .math-font {
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      font-style: italic;
+    }
+    .mono-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .arcade-card {
+      transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .arcade-card:hover {
+      transform: translateY(-6px) scale(1.015);
+    }
+    .bubble-float {
+      animation: floatSlow 3.2s ease-in-out infinite alternate;
+    }
+    @keyframes floatSlow {
+      0% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(1.5deg); }
+      100% { transform: translateY(0px) rotate(-1.5deg); }
+    }
+    .cross-line {
+      stroke-dasharray: 6;
+      animation: dash 1.2s linear infinite;
+    }
+    @keyframes dash {
+      to { stroke-dashoffset: -12; }
+    }
+    .shake-anim {
+      animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-3px, 0, 0); }
+      20%, 80% { transform: translate3d(4px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+      40%, 60% { transform: translate3d(5px, 0, 0); }
+    }
+    .wheel-glow {
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.25), 0 0 14px rgba(245, 158, 11, 0.2);
+    }
+
+    /* 磁吸拼圖專用格線與高亮樣式 */
+    .snap-board-cell {
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+    .snap-board-cell:hover {
+      background-color: rgba(56, 189, 248, 0.15);
+    }
+    .snap-board-cell.preview-hover {
+      background-color: rgba(99, 102, 241, 0.35);
+      outline: 2px dashed #818cf8;
+    }
+    .snap-board-cell.preview-invalid {
+      background-color: rgba(239, 68, 68, 0.35);
+      outline: 2px dashed #f87171;
+    }
+
+    /* 積木擺放與選取狀態 */
+    .piece-selector-active {
+      outline: 3px solid #38bdf8;
+      transform: scale(1.03);
+    }
+
+    /* 密碼盤轉動動畫 */
+    .dial-spin {
+      transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+
+  <header class="w-full bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-50 px-4 py-3 shadow-lg">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="App.showLobby()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 flex items-center justify-center font-black text-xl shadow-md text-white math-font">
+          x²
+        </div>
+        <div>
+          <h1 class="text-lg md:text-xl font-black tracking-tight text-white flex items-center gap-2">
+            因式分解大冒險
+            <span class="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">國二數學</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Algebra Arcade • 自由面積拼圖 • 十字交乘硬核解鎖 • 泡泡消除</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 md:gap-4">
+        <!-- 音效切換 -->
+        <button id="soundToggleBtn" onclick="Sound.toggle()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-700 text-xs md:text-sm font-semibold transition border border-slate-600 text-slate-200">
+          <span id="soundIcon">🔊</span>
+          <span id="soundText" class="hidden sm:inline">音效開</span>
+        </button>
+        <!-- 返回大廳按鈕 -->
+        <button id="navBackBtn" onclick="App.showLobby()" class="hidden px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs md:text-sm font-bold text-white shadow-md transition">
+          🏠 返回大廳
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col items-center justify-center">
+
+    <!-- ========================================== -->
+    <!-- 1. 首頁大廳 (LOBBY VIEW) -->
+    <!-- ========================================== -->
+    <div id="viewLobby" class="w-full flex flex-col items-center">
+      <div class="text-center max-w-2xl my-3">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-sky-300 to-indigo-300 mb-2">
+          掌握代數的結構與直觀之美！
+        </h2>
+        <p class="text-slate-300 text-sm md:text-base leading-relaxed">
+          三大實戰關卡：幾何面積拼圖沙盒、考驗真本領的十字交乘心算密碼盤，以及高壓因式泡泡消除戰！
+        </p>
+      </div>
+
+      <!-- 統計數據條 -->
+      <div class="w-full max-w-3xl grid grid-cols-3 gap-3 my-4 bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/60 text-center shadow-lg">
+        <div>
+          <div class="text-xs text-slate-400 font-semibold">面積拼圖關卡</div>
+          <div id="statTileLvl" class="text-lg md:text-2xl font-black text-emerald-400 mono-font">Lv.1</div>
+        </div>
+        <div class="border-x border-slate-700">
+          <div class="text-xs text-slate-400 font-semibold">十字交乘最高分</div>
+          <div id="statCrossScore" class="text-lg md:text-2xl font-black text-amber-400 mono-font">0 分</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 font-semibold">泡泡戰最高連擊</div>
+          <div id="statBubbleCombo" class="text-lg md:text-2xl font-black text-sky-400 mono-font">0 Combo</div>
+        </div>
+      </div>
+
+      <!-- 三大遊戲卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mt-3">
+        <!-- 遊戲 1 -->
+        <div class="arcade-card bg-gradient-to-b from-slate-800 to-slate-850 p-6 rounded-3xl border border-emerald-500/30 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+          <div class="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition"></div>
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-3xl p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-2xl">📐</span>
+              <span class="px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">沙盒挑戰</span>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">面積拼圖大作戰</h3>
+            <p class="text-xs text-emerald-400 font-mono mb-2">Algebra Tiles Free Sandbox</p>
+            <p class="text-slate-300 text-xs md:text-sm leading-relaxed mb-4">
+              無預設輪廓的磁吸工作台！旋轉長條 $x$，自由佈局長寬，用「長 × 寬」實證密合實心大長方形！
+            </p>
+          </div>
+          <button onclick="App.startTileGame()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center justify-center gap-2">
+            <span>進入沙盒挑戰</span>
+            <span>➜</span>
+          </button>
+        </div>
+
+        <!-- 遊戲 2 -->
+        <div class="arcade-card bg-gradient-to-b from-slate-800 to-slate-850 p-6 rounded-3xl border border-amber-500/30 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+          <div class="absolute -right-6 -top-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition"></div>
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-3xl p-3 bg-amber-950/60 border border-amber-500/40 rounded-2xl">⚙️</span>
+              <span class="px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">真本領心算</span>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">十字交乘密碼盤</h3>
+            <p class="text-xs text-amber-400 font-mono mb-2">Cross-Cipher Hardcore</p>
+            <p class="text-slate-300 text-xs md:text-sm leading-relaxed mb-4">
+              無盲測輔助！手動選定係數組合，心算交叉相乘，按下【驗證解鎖】看成果，答錯有具體心算診斷！
+            </p>
+          </div>
+          <button onclick="App.startCrossGame()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-amber-900/40 transition flex items-center justify-center gap-2">
+            <span>啟動密碼盤</span>
+            <span>➜</span>
+          </button>
+        </div>
+
+        <!-- 遊戲 3 -->
+        <div class="arcade-card bg-gradient-to-b from-slate-800 to-slate-850 p-6 rounded-3xl border border-sky-500/30 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+          <div class="absolute -right-6 -top-6 w-24 h-24 bg-sky-500/10 rounded-full blur-xl group-hover:bg-sky-500/20 transition"></div>
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-3xl p-3 bg-sky-950/60 border border-sky-500/40 rounded-2xl">🫧</span>
+              <span class="px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30">連鎖連擊</span>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-1">因式泡泡消除戰</h3>
+            <p class="text-xs text-sky-400 font-mono mb-2">Factor Bubble Matcher</p>
+            <p class="text-slate-300 text-xs md:text-sm leading-relaxed mb-4">
+              漂浮的因式泡泡！心算瞄準配對的兩顆一次式，連續點擊擊破，引爆連鎖 Combo 與高分！
+            </p>
+          </div>
+          <button onclick="App.startBubbleGame()" class="w-full py-3 bg-sky-600 hover:bg-sky-500 active:scale-95 text-white font-bold rounded-xl shadow-lg shadow-sky-900/40 transition flex items-center justify-center gap-2">
+            <span>進入射擊</span>
+            <span>➜</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. 遊戲 1：面積拼圖大作戰 (真自由沙盒版) -->
+    <!-- ========================================== -->
+    <div id="viewTileGame" class="hidden w-full max-w-5xl flex-col items-center">
+      <!-- 頂部導航與關卡資訊列 -->
+      <div class="w-full flex flex-wrap items-center justify-between bg-slate-800/90 border border-slate-700 p-3.5 rounded-2xl mb-4 gap-2 shadow-md">
+        <div class="flex items-center gap-3">
+          <span class="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-xl text-sm" id="tileLvlBadge">關卡 1</span>
+          <span class="text-xs text-slate-300">開放磁吸工作台：將所有積木在無預設輪廓下拼成<b>實心大長方形</b>！</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="TileGame.giveHint()" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs rounded-lg font-bold transition flex items-center gap-1">
+            <span>💡</span> <span>小提示</span>
+          </button>
+          <button onclick="TileGame.clearWorkspace()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs rounded-lg font-semibold transition text-slate-200">
+            清空重擺
+          </button>
+          <button onclick="TileGame.prevLevel()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs rounded-lg font-semibold transition">
+            ◀ 上題
+          </button>
+          <button onclick="TileGame.nextLevel()" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs rounded-lg font-bold transition text-white">
+            下一題 ▶
+          </button>
+        </div>
+      </div>
+
+      <!-- 目標多項式看板與成功因式分解公式標註 -->
+      <div class="w-full bg-slate-800 border-2 border-emerald-500/40 rounded-3xl p-5 mb-4 text-center shadow-xl relative overflow-hidden">
+        <div class="text-xs text-emerald-400 font-bold tracking-widest uppercase mb-1">目標多項式總面積 Target Area</div>
+        <div id="tileTargetPoly" class="text-3xl md:text-5xl font-black text-white math-font tracking-wide">
+          x² + 5x + 6
+        </div>
+        <!-- 成功結算橫幅 -->
+        <div id="tileSuccessBanner" class="hidden mt-4 p-4 bg-emerald-950/80 border-2 border-emerald-400 text-emerald-100 rounded-2xl shadow-xl animate-bounce">
+          <div class="text-base md:text-xl font-black">🎉 完美拼出實心大長方形！</div>
+          <div class="text-sm md:text-base mt-1 text-slate-200">
+            面積 = (長) × (寬) ＝ <span id="tileFactorResult" class="text-amber-300 math-font font-black text-lg md:text-2xl"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 拼圖主要操作介面 (左側道具盒，右側自由磁吸畫布) -->
+      <div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        
+        <!-- 左側：零件盒與方向控制器 (4 cols) -->
+        <div class="lg:col-span-4 bg-slate-800/90 p-4.5 rounded-3xl border border-slate-700 flex flex-col gap-3.5 shadow-lg">
+          <div class="text-sm font-black text-slate-200 border-b border-slate-700 pb-2.5 flex justify-between items-center">
+            <span class="flex items-center gap-1.5"><span>🎒</span> 零件背包</span>
+            <span class="text-xs text-slate-400 font-normal">點選積木後放到工作台</span>
+          </div>
+
+          <!-- 積木 1: x^2 (尺寸 3x3 單位) -->
+          <div id="btnPickX2" onclick="TileGame.selectTool('x2')" class="p-3 rounded-2xl bg-slate-700/60 border-2 border-indigo-500/50 hover:border-indigo-400 cursor-pointer flex items-center justify-between transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-base shadow border border-indigo-400 math-font">
+                x²
+              </div>
+              <div>
+                <div class="font-bold text-white text-sm">正方形 x²</div>
+                <div class="text-xs text-slate-400 font-mono">尺寸：3 × 3 (x·x)</div>
+              </div>
+            </div>
+            <div id="badgeCountX2" class="text-base font-black text-indigo-300 mono-font">剩 1 個</div>
+          </div>
+
+          <!-- 積木 2: x 長條 (支援 旋轉 3x1 水平 或 1x3 垂直) -->
+          <div id="btnPickX" onclick="TileGame.selectTool('x')" class="p-3 rounded-2xl bg-slate-700/60 border-2 border-teal-500/50 hover:border-teal-400 cursor-pointer flex flex-col gap-2 transition group">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div id="previewXIcon" class="w-12 h-6 bg-teal-600 rounded-md flex items-center justify-center font-black text-white text-xs shadow border border-teal-300 math-font transition-all duration-200">
+                  x
+                </div>
+                <div>
+                  <div class="font-bold text-white text-sm">長條 x</div>
+                  <div id="labelXOrientation" class="text-xs text-teal-300 font-mono">水平 (3 × 1)</div>
+                </div>
+              </div>
+              <div id="badgeCountX" class="text-base font-black text-teal-300 mono-font">剩 5 個</div>
+            </div>
+
+            <!-- 旋轉按鈕控制列 -->
+            <div class="pt-2 border-t border-slate-600/50 flex items-center justify-between">
+              <span class="text-[11px] text-slate-400">學生需決定橫放或直放：</span>
+              <button onclick="event.stopPropagation(); TileGame.toggleXRotation();" class="px-2.5 py-1 bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 font-black text-xs rounded-lg shadow transition flex items-center gap-1">
+                <span>🔄</span> <span>旋轉方向</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 積木 3: 1 單位方塊 (尺寸 1x1 單位) -->
+          <div id="btnPick1" onclick="TileGame.selectTool('unit')" class="p-3 rounded-2xl bg-slate-700/60 border-2 border-amber-500/50 hover:border-amber-400 cursor-pointer flex items-center justify-between transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-7 h-7 bg-amber-500 rounded-md flex items-center justify-center font-black text-slate-950 text-xs shadow border border-amber-300 font-mono">
+                1
+              </div>
+              <div>
+                <div class="font-bold text-white text-sm">小方塊 1</div>
+                <div class="text-xs text-slate-400 font-mono">尺寸：1 × 1</div>
+              </div>
+            </div>
+            <div id="badgeCount1" class="text-base font-black text-amber-300 mono-font">剩 6 個</div>
+          </div>
+
+          <!-- 模式與工具切換：橡皮擦 -->
+          <div id="btnPickEraser" onclick="TileGame.selectTool('eraser')" class="p-2.5 rounded-xl bg-slate-800 border border-rose-500/40 hover:border-rose-400 cursor-pointer flex items-center justify-between transition text-rose-300 text-xs font-bold">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🧹</span>
+              <span>橡皮擦模式 (點擊畫布上的積木可移除)</span>
+            </div>
+          </div>
+
+          <!-- 遊戲規則與教學原則提示卡 -->
+          <div class="mt-1 text-xs text-slate-400 bg-slate-900/70 p-3 rounded-2xl border border-slate-750 space-y-1.5 leading-relaxed">
+            <div class="text-emerald-400 font-bold flex items-center gap-1">
+              <span>📐</span> <span>幾何因式分解守則：</span>
+            </div>
+            <p>1. 背包內的所有積木必須<b>全部用完</b>。</p>
+            <p>2. 積木不可重疊、不可留內部空洞。</p>
+            <p>3. 最終輪廓必須拼成一個完整的<b>實心無缺角大長方形</b>！</p>
+          </div>
+        </div>
+
+        <!-- 右側：開放磁吸工作台與尺寸標籤 (8 cols) -->
+        <div class="lg:col-span-8 bg-slate-850 p-4 rounded-3xl border border-slate-700 flex flex-col items-center shadow-2xl relative">
+          
+          <!-- 目前使用中的工具指示列 -->
+          <div class="w-full flex items-center justify-between text-xs text-slate-300 mb-2 px-1">
+            <div class="flex items-center gap-2">
+              <span>當前持拿工具：</span>
+              <span id="currentToolDisplay" class="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold">正方形 x²</span>
+            </div>
+            <div class="text-slate-400">
+              💡 點擊工作台格線放置，再點擊放置處可移除
+            </div>
+          </div>
+
+          <!-- 尺寸邊長標註外層容器 -->
+          <div class="relative p-2 md:p-6 flex flex-col items-center justify-center w-full overflow-x-auto">
+            <!-- 上側標籤 (長度) -->
+            <div id="boardTopBracket" class="h-8 flex items-center justify-center text-teal-300 font-bold math-font text-sm md:text-base border-b-2 border-teal-500/60 pb-1 mb-2 px-4 opacity-0 transition-opacity">
+              長度 = x + 3
+            </div>
+
+            <div class="flex items-center justify-center">
+              <!-- 左側標籤 (寬度) -->
+              <div id="boardLeftBracket" class="w-8 flex items-center justify-center text-indigo-300 font-bold math-font text-sm md:text-base border-r-2 border-indigo-500/60 pr-1 mr-2 [writing-mode:vertical-lr] rotate-180 opacity-0 transition-opacity">
+                寬度 = x + 2
+              </div>
+
+              <!-- 磁吸工作台 (10 x 10) -->
+              <div id="sandboxGrid" class="relative bg-slate-950 border-2 border-slate-700 rounded-2xl grid shadow-inner p-1 select-none cursor-crosshair">
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部操作列：驗證長方形按鈕 -->
+          <div class="mt-4 w-full flex flex-col sm:flex-row gap-3 items-center justify-between px-2 pt-2 border-t border-slate-800">
+            <div class="text-xs text-slate-400 flex items-center gap-1.5">
+              <span>狀態：</span>
+              <span id="placementStatusText" class="text-slate-300 font-semibold">請將零件放到工作台進行組合</span>
+            </div>
+
+            <button onclick="TileGame.checkRectangle()" class="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-emerald-900/40 active:scale-95 transition flex items-center justify-center gap-2">
+              <span>📐 檢查是否拼成長方形</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. 遊戲 2：十字交乘密碼盤 (全新硬核心算版) -->
+    <!-- ========================================== -->
+    <div id="viewCrossGame" class="hidden w-full max-w-3xl flex-col items-center">
+      <!-- 頂部模式切換與狀態列 -->
+      <div class="w-full flex flex-wrap items-center justify-between bg-slate-800/90 border border-slate-700 p-3.5 rounded-2xl mb-4 gap-3 shadow-md">
+        <!-- 模式切換按鈕組 -->
+        <div class="flex items-center gap-2">
+          <button id="btnCrossModePuzzle" onclick="CrossGame.setMode('puzzle')" class="px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-amber-500 text-slate-950 shadow transition">
+            🛡️ 闖關模式 (3心)
+          </button>
+          <button id="btnCrossModeSpeed" onclick="CrossGame.setMode('speed')" class="px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 transition">
+            ⚡ 極速 60s 衝刺
+          </button>
+        </div>
+
+        <!-- 狀態指標：生命值或倒數計時 -->
+        <div class="flex items-center gap-4">
+          <div id="crossStatusBox" class="flex items-center gap-1.5 text-rose-400 font-black text-base md:text-lg">
+            <span>生命：</span><span id="crossLivesDisplay">❤️❤️❤️</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-400">目前分數</span>
+            <div id="crossScore" class="font-black text-xl text-amber-300 mono-font">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 題目顯示板 -->
+      <div class="w-full bg-slate-800 border-2 border-amber-500/40 rounded-3xl p-5 mb-4 text-center shadow-xl relative overflow-hidden">
+        <div class="flex justify-between items-center px-2 mb-1">
+          <span class="text-xs text-amber-400 font-bold tracking-widest uppercase">十字交乘密碼鎖 Factor Cipher</span>
+          <span id="crossProgressBadge" class="text-xs font-mono bg-slate-700/80 text-amber-300 px-2.5 py-0.5 rounded-full font-bold">第 1 / 5 關</span>
+        </div>
+        
+        <div id="crossTargetPoly" class="text-3xl md:text-5xl font-black text-white math-font tracking-wide my-1">
+          x² - 5x - 24
+        </div>
+        
+        <div class="text-xs text-slate-300 mt-2 flex items-center justify-center gap-1.5">
+          <span>🧠</span>
+          <span>在心中或計算紙上十字交乘配對，轉好組合後按下<b>【驗證並解鎖】</b>！</span>
+        </div>
+      </div>
+
+      <!-- 十字交乘核心轉盤區 -->
+      <div class="w-full bg-slate-850 border border-slate-700/90 rounded-3xl p-4 md:p-6 shadow-2xl relative">
+        <!-- SVG 十字交叉示意線 -->
+        <svg id="crossSvgLines" class="absolute inset-0 w-full h-full pointer-events-none z-10 opacity-70">
+          <line id="line1" x1="26%" y1="35%" x2="74%" y2="67%" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" class="cross-line"/>
+          <line id="line2" x1="26%" y1="67%" x2="74%" y2="35%" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" class="cross-line"/>
+        </svg>
+
+        <div class="grid grid-cols-3 gap-2 md:gap-4 items-center relative z-20">
+          
+          <!-- 左側：二次項拆解 (首項轉盤) -->
+          <div class="flex flex-col items-center gap-4">
+            <div class="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1">
+              <span>首項拆解</span>
+            </div>
+
+            <!-- 頭項 1 -->
+            <div class="w-24 md:w-32 bg-slate-800 rounded-2xl border-2 border-sky-500/60 p-2.5 text-center shadow-lg wheel-glow flex flex-col items-center">
+              <span class="text-[10px] text-slate-400 font-mono">因式 (1)</span>
+              <div id="termA1" class="text-xl md:text-2xl font-black text-sky-300 math-font my-1 dial-spin">x</div>
+              <div class="flex gap-1.5 mt-1">
+                <button onclick="CrossGame.stepHead(1, -1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▲</button>
+                <button onclick="CrossGame.stepHead(1, 1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▼</button>
+              </div>
+            </div>
+
+            <!-- 頭項 2 -->
+            <div class="w-24 md:w-32 bg-slate-800 rounded-2xl border-2 border-sky-500/60 p-2.5 text-center shadow-lg wheel-glow flex flex-col items-center">
+              <span class="text-[10px] text-slate-400 font-mono">因式 (2)</span>
+              <div id="termA2" class="text-xl md:text-2xl font-black text-sky-300 math-font my-1 dial-spin">x</div>
+              <div class="flex gap-1.5 mt-1">
+                <button onclick="CrossGame.stepHead(2, -1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▲</button>
+                <button onclick="CrossGame.stepHead(2, 1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▼</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 中央：保密式轉軸狀態 (不再直接透露交叉和答案) -->
+          <div class="flex flex-col items-center justify-center py-4 px-1 text-center">
+            <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-900 border-2 border-slate-700 flex flex-col items-center justify-center shadow-inner relative">
+              <span id="lockStatusIcon" class="text-2xl md:text-3xl">🔒</span>
+              <span class="text-[10px] text-slate-400 font-mono mt-0.5">待解鎖</span>
+            </div>
+
+            <div class="mt-3 text-[11px] text-slate-400 max-w-[150px] leading-tight">
+              齒輪已就緒<br>
+              請確認交叉相乘和是否正確
+            </div>
+
+            <!-- 診斷反饋框 (按下驗證後才顯示) -->
+            <div id="crossFeedbackBox" class="hidden mt-3 p-2 bg-slate-900 border rounded-xl text-[11px] mono-font w-full max-w-[200px]">
+              <div id="feedbackText1" class="text-slate-300"></div>
+              <div id="feedbackText2" class="font-bold mt-0.5"></div>
+            </div>
+          </div>
+
+          <!-- 右側：常數項拆解 (尾項轉盤，含陷阱因數) -->
+          <div class="flex flex-col items-center gap-4">
+            <div class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+              <span>常數拆解</span>
+            </div>
+
+            <!-- 尾項 1 -->
+            <div class="w-24 md:w-32 bg-slate-800 rounded-2xl border-2 border-amber-500/60 p-2.5 text-center shadow-lg wheel-glow flex flex-col items-center">
+              <span class="text-[10px] text-slate-400 font-mono">因數 (1)</span>
+              <div id="termC1" class="text-xl md:text-2xl font-black text-amber-300 math-font my-1 dial-spin">+1</div>
+              <div class="flex gap-1.5 mt-1">
+                <button onclick="CrossGame.stepTail(1, -1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▲</button>
+                <button onclick="CrossGame.stepTail(1, 1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▼</button>
+              </div>
+            </div>
+
+            <!-- 尾項 2 -->
+            <div class="w-24 md:w-32 bg-slate-800 rounded-2xl border-2 border-amber-500/60 p-2.5 text-center shadow-lg wheel-glow flex flex-col items-center">
+              <span class="text-[10px] text-slate-400 font-mono">因數 (2)</span>
+              <div id="termC2" class="text-xl md:text-2xl font-black text-amber-300 math-font my-1 dial-spin">-24</div>
+              <div class="flex gap-1.5 mt-1">
+                <button onclick="CrossGame.stepTail(2, -1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▲</button>
+                <button onclick="CrossGame.stepTail(2, 1)" class="w-7 h-6 bg-slate-700 hover:bg-slate-600 rounded-md text-xs font-bold">▼</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 驗證解鎖按鈕 -->
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <button id="crossVerifyBtn" onclick="CrossGame.verify()" class="w-full sm:w-auto px-10 py-3 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-base rounded-2xl shadow-xl shadow-amber-950/50 transition transform active:scale-95 flex items-center justify-center gap-2">
+            <span>🔐 驗證並解鎖</span>
+          </button>
+          
+          <button onclick="CrossGame.skipOrGiveHint()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs rounded-xl font-bold transition">
+            💡 心算小訣竅
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. 遊戲 3：因式泡泡消除戰 (BUBBLE GAME) -->
+    <!-- ========================================== -->
+    <div id="viewBubbleGame" class="hidden w-full max-w-4xl flex-col items-center">
+      <!-- 頂部計分面板 -->
+      <div class="w-full flex items-center justify-between bg-slate-800/80 border border-slate-700 p-3 rounded-2xl mb-3">
+        <div class="flex items-center gap-3">
+          <span class="px-3 py-1 bg-sky-500/20 border border-sky-500/40 text-sky-300 font-bold rounded-xl text-sm">泡泡消消樂</span>
+          <div class="text-xs md:text-sm font-bold text-amber-400 flex items-center gap-1">
+            🔥 連擊：<span id="bubbleComboText" class="text-base font-black mono-font">0</span> Combo
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div>
+            <span class="text-xs text-slate-400">得分</span>
+            <span id="bubbleScore" class="font-black text-xl text-sky-300 ml-1 mono-font">0</span>
+          </div>
+          <button onclick="BubbleGame.initRound()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs rounded-lg font-semibold text-slate-200">刷新泡泡</button>
+        </div>
+      </div>
+
+      <!-- 目標消除板 -->
+      <div class="w-full bg-slate-800 border-2 border-sky-500/40 rounded-3xl p-4 md:p-5 mb-4 text-center shadow-lg relative overflow-hidden">
+        <div class="text-xs text-sky-400 font-bold tracking-widest uppercase mb-1">待消解多項式 Target</div>
+        <div id="bubbleTargetPoly" class="text-3xl md:text-4xl font-black text-white math-font tracking-wide">
+          x² - x - 6
+        </div>
+        <div class="text-xs text-slate-300 mt-2 flex justify-center items-center gap-2">
+          <span>已選中因式：</span>
+          <span id="selectedBubble1" class="px-2.5 py-0.5 rounded-lg bg-slate-700 text-sky-300 font-mono font-bold">無</span>
+          <span>與</span>
+          <span id="selectedBubble2" class="px-2.5 py-0.5 rounded-lg bg-slate-700 text-sky-300 font-mono font-bold">無</span>
+        </div>
+      </div>
+
+      <!-- 泡泡浮動生成海域 -->
+      <div id="bubbleField" class="w-full min-h-[340px] md:min-h-[400px] bg-gradient-to-b from-slate-850 to-slate-900 border border-slate-700/80 rounded-3xl p-6 relative flex flex-wrap items-center justify-center content-center gap-4 md:gap-6 overflow-hidden shadow-2xl">
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="w-full bg-slate-950/80 border-t border-slate-800 text-center py-3 text-xs text-slate-500">
+    國中二年級數學專用教材 • 因式分解單元教學互動套件 • 磁吸幾何面積、十字交乘與乘法公式
+  </footer>
+
+  <!-- 全域浮動提示 (取代 alert) -->
+  <div id="toastNotification" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 px-5 py-2.5 rounded-2xl bg-slate-800 text-white font-bold text-sm shadow-2xl border border-slate-600 pointer-events-none transition-all duration-300 opacity-0 translate-y-4 z-50 flex items-center gap-2">
+    <span id="toastIcon">💡</span>
+    <span id="toastMsg">提示文字</span>
+  </div>
+
+  <script>
+    const Sound = {
+      enabled: true,
+      ctx: null,
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+      },
+
+      toggle() {
+        this.enabled = !this.enabled;
+        const icon = document.getElementById('soundIcon');
+        const text = document.getElementById('soundText');
+        if (this.enabled) {
+          icon.textContent = '🔊';
+          text.textContent = '音效開';
+          this.playBeep(600, 'sine', 0.1);
+        } else {
+          icon.textContent = '🔇';
+          text.textContent = '音效關';
+        }
+      },
+
+      playBeep(freq = 440, type = 'sine', duration = 0.12, vol = 0.2) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      },
+
+      playSuccess() {
+        if (!this.enabled) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          setTimeout(() => {
+            this.playBeep(freq, 'triangle', 0.25, 0.25);
+          }, i * 90);
+        });
+      },
+
+      playSnap() {
+        if (!this.enabled) return;
+        this.playBeep(700, 'triangle', 0.06, 0.2);
+      },
+
+      playRotate() {
+        if (!this.enabled) return;
+        this.playBeep(520, 'sine', 0.08, 0.25);
+      },
+
+      playPop() {
+        if (!this.enabled) return;
+        this.playBeep(850, 'sine', 0.08, 0.3);
+      },
+
+      playClick() {
+        if (!this.enabled) return;
+        this.playBeep(400, 'square', 0.04, 0.05);
+      },
+
+      playWrong() {
+        if (!this.enabled) return;
+        this.playBeep(180, 'sawtooth', 0.25, 0.3);
+      }
+    };
+
+    const App = {
+      init() {
+        this.loadStats();
+        window.addEventListener('click', () => Sound.init(), { once: true });
+        window.addEventListener('touchstart', () => Sound.init(), { once: true });
+      },
+
+      showToast(msg, icon = '💡') {
+        const toast = document.getElementById('toastNotification');
+        const msgEl = document.getElementById('toastMsg');
+        const iconEl = document.getElementById('toastIcon');
+        msgEl.textContent = msg;
+        iconEl.textContent = icon;
+        toast.classList.remove('opacity-0', 'translate-y-4');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+          toast.classList.remove('opacity-100', 'translate-y-0');
+          toast.classList.add('opacity-0', 'translate-y-4');
+        }, 2500);
+      },
+
+      loadStats() {
+        const tileLvl = localStorage.getItem('fa_tile_level') || 1;
+        const crossScore = localStorage.getItem('fa_cross_score') || 0;
+        const bubbleCombo = localStorage.getItem('fa_bubble_combo') || 0;
+        document.getElementById('statTileLvl').textContent = `Lv.${tileLvl}`;
+        document.getElementById('statCrossScore').textContent = `${crossScore} 分`;
+        document.getElementById('statBubbleCombo').textContent = `${bubbleCombo} Combo`;
+      },
+
+      hideAllViews() {
+        document.getElementById('viewLobby').classList.add('hidden');
+        document.getElementById('viewTileGame').classList.add('hidden');
+        document.getElementById('viewCrossGame').classList.add('hidden');
+        document.getElementById('viewBubbleGame').classList.add('hidden');
+        document.getElementById('navBackBtn').classList.remove('hidden');
+      },
+
+      showLobby() {
+        this.hideAllViews();
+        document.getElementById('navBackBtn').classList.add('hidden');
+        document.getElementById('viewLobby').classList.remove('hidden');
+        this.loadStats();
+        if (CrossGame.timerInterval) clearInterval(CrossGame.timerInterval);
+      },
+
+      startTileGame() {
+        this.hideAllViews();
+        document.getElementById('viewTileGame').classList.remove('hidden');
+        TileGame.init();
+      },
+
+      startCrossGame() {
+        this.hideAllViews();
+        document.getElementById('viewCrossGame').classList.remove('hidden');
+        CrossGame.init();
+      },
+
+      startBubbleGame() {
+        this.hideAllViews();
+        document.getElementById('viewBubbleGame').classList.remove('hidden');
+        BubbleGame.init();
+      }
+    };
+
+    const TileGame = {
+      levels: [
+        { level: 1, poly: "x² + 3x + 2", a: 1, b: 2, factorText: "(x + 1)(x + 2)" },
+        { level: 2, poly: "x² + 4x + 3", a: 1, b: 3, factorText: "(x + 1)(x + 3)" },
+        { level: 3, poly: "x² + 5x + 6", a: 2, b: 3, factorText: "(x + 2)(x + 3)" },
+        { level: 4, poly: "x² + 6x + 8", a: 2, b: 4, factorText: "(x + 2)(x + 4)" },
+        { level: 5, poly: "x² + 7x + 12", a: 3, b: 4, factorText: "(x + 3)(x + 4)" }
+      ],
+      currentIdx: 0,
+      GRID_ROWS: 10,
+      GRID_COLS: 10,
+      X_UNITS: 3,
+      activeTool: 'x2',
+      xOrientation: 'horizontal',
+      placedPieces: [],
+      nextPieceId: 1,
+      occupancyGrid: [],
+
+      init() {
+        const savedLvl = parseInt(localStorage.getItem('fa_tile_level') || '1', 10);
+        this.currentIdx = Math.min(Math.max(0, savedLvl - 1), this.levels.length - 1);
+        this.loadLevel();
+      },
+
+      loadLevel() {
+        const cur = this.levels[this.currentIdx];
+        document.getElementById('tileLvlBadge').textContent = `關卡 ${cur.level}`;
+        document.getElementById('tileTargetPoly').textContent = cur.poly;
+        document.getElementById('tileSuccessBanner').classList.add('hidden');
+        document.getElementById('boardTopBracket').classList.add('opacity-0');
+        document.getElementById('boardLeftBracket').classList.add('opacity-0');
+        document.getElementById('placementStatusText').textContent = "請從背包選擇積木，自由擺放大長方形！";
+
+        this.reqX2 = 1;
+        this.reqX = cur.a + cur.b;
+        this.reqUnit = cur.a * cur.b;
+
+        this.clearWorkspace();
+      },
+
+      clearWorkspace() {
+        this.placedPieces = [];
+        this.occupancyGrid = Array(this.GRID_ROWS).fill(null).map(() => Array(this.GRID_COLS).fill(null));
+        this.selectTool('x2');
+        this.renderSandboxBoard();
+        this.updateInventoryUI();
+        document.getElementById('boardTopBracket').classList.add('opacity-0');
+        document.getElementById('boardLeftBracket').classList.add('opacity-0');
+        document.getElementById('tileSuccessBanner').classList.add('hidden');
+      },
+
+      selectTool(tool) {
+        Sound.playClick();
+        this.activeTool = tool;
+
+        ['btnPickX2', 'btnPickX', 'btnPick1', 'btnPickEraser'].forEach(id => {
+          document.getElementById(id).classList.remove('piece-selector-active');
+        });
+
+        const displayEl = document.getElementById('currentToolDisplay');
+        if (tool === 'x2') {
+          document.getElementById('btnPickX2').classList.add('piece-selector-active');
+          displayEl.textContent = '正方形 x² (3×3)';
+          displayEl.className = 'px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold';
+        } else if (tool === 'x') {
+          document.getElementById('btnPickX').classList.add('piece-selector-active');
+          const oriText = this.xOrientation === 'horizontal' ? '水平 (3×1)' : '垂直 (1×3)';
+          displayEl.textContent = `長條 x [${oriText}]`;
+          displayEl.className = 'px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 font-bold';
+        } else if (tool === 'unit') {
+          document.getElementById('btnPick1').classList.add('piece-selector-active');
+          displayEl.textContent = '小方塊 1 (1×1)';
+          displayEl.className = 'px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold';
+        } else if (tool === 'eraser') {
+          document.getElementById('btnPickEraser').classList.add('piece-selector-active');
+          displayEl.textContent = '橡皮擦模式';
+          displayEl.className = 'px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold';
+        }
+      },
+
+      toggleXRotation() {
+        Sound.playRotate();
+        this.xOrientation = this.xOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+        
+        const previewIcon = document.getElementById('previewXIcon');
+        const labelOri = document.getElementById('labelXOrientation');
+
+        if (this.xOrientation === 'horizontal') {
+          previewIcon.className = "w-12 h-6 bg-teal-600 rounded-md flex items-center justify-center font-black text-white text-xs shadow border border-teal-300 math-font transition-all duration-200";
+          labelOri.textContent = "水平 (3 × 1)";
+        } else {
+          previewIcon.className = "w-6 h-12 bg-teal-600 rounded-md flex items-center justify-center font-black text-white text-xs shadow border border-teal-300 math-font transition-all duration-200";
+          labelOri.textContent = "垂直 (1 × 3)";
+        }
+
+        if (this.activeTool === 'x') {
+          this.selectTool('x');
+        }
+      },
+
+      updateInventoryUI() {
+        const usedX2 = this.placedPieces.filter(p => p.type === 'x2').length;
+        const usedX = this.placedPieces.filter(p => p.type === 'x').length;
+        const used1 = this.placedPieces.filter(p => p.type === 'unit').length;
+
+        const remX2 = this.reqX2 - usedX2;
+        const remX = this.reqX - usedX;
+        const rem1 = this.reqUnit - used1;
+
+        document.getElementById('badgeCountX2').textContent = `剩 ${remX2} 個`;
+        document.getElementById('badgeCountX').textContent = `剩 ${remX} 個`;
+        document.getElementById('badgeCount1').textContent = `剩 ${rem1} 個`;
+
+        document.getElementById('badgeCountX2').className = remX2 <= 0 ? "text-base font-bold text-slate-500 mono-font" : "text-base font-black text-indigo-300 mono-font";
+        document.getElementById('badgeCountX').className = remX <= 0 ? "text-base font-bold text-slate-500 mono-font" : "text-base font-black text-teal-300 mono-font";
+        document.getElementById('badgeCount1').className = rem1 <= 0 ? "text-base font-bold text-slate-500 mono-font" : "text-base font-black text-amber-300 mono-font";
+      },
+
+      renderSandboxBoard() {
+        const gridEl = document.getElementById('sandboxGrid');
+        gridEl.innerHTML = '';
+        gridEl.style.gridTemplateRows = `repeat(${this.GRID_ROWS}, 28px)`;
+        gridEl.style.gridTemplateColumns = `repeat(${this.GRID_COLS}, 28px)`;
+
+        for (let r = 0; r < this.GRID_ROWS; r++) {
+          for (let c = 0; c < this.GRID_COLS; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'w-7 h-7 snap-board-cell rounded-sm flex items-center justify-center transition-colors relative';
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+
+            cell.addEventListener('mouseenter', () => this.handleCellHover(r, c));
+            cell.addEventListener('mouseleave', () => this.clearHoverPreview());
+            cell.addEventListener('click', () => this.handleGridClick(r, c));
+
+            gridEl.appendChild(cell);
+          }
+        }
+
+        this.placedPieces.forEach(piece => {
+          const pieceEl = document.createElement('div');
+          pieceEl.className = 'absolute rounded-lg flex items-center justify-center font-black cursor-pointer shadow-md select-none border transition-transform active:scale-95';
+          pieceEl.style.left = `${piece.c * 28 + 4}px`;
+          pieceEl.style.top = `${piece.r * 28 + 4}px`;
+          pieceEl.style.width = `${piece.w * 28 - 2}px`;
+          pieceEl.style.height = `${piece.h * 28 - 2}px`;
+
+          if (piece.type === 'x2') {
+            pieceEl.className += ' bg-indigo-600/95 border-indigo-400 text-white math-font text-lg shadow-indigo-900/50';
+            pieceEl.innerHTML = 'x²';
+          } else if (piece.type === 'x') {
+            pieceEl.className += ' bg-teal-600/95 border-teal-300 text-white math-font text-sm shadow-teal-900/50';
+            pieceEl.innerHTML = 'x';
+          } else if (piece.type === 'unit') {
+            pieceEl.className += ' bg-amber-500/95 border-amber-300 text-slate-950 font-mono text-xs shadow-amber-900/40';
+            pieceEl.innerHTML = '1';
+          }
+
+          pieceEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.removePiece(piece.id);
+          });
+
+          gridEl.appendChild(pieceEl);
+        });
+      },
+
+      getToolDimensions() {
+        if (this.activeTool === 'x2') {
+          return { w: this.X_UNITS, h: this.X_UNITS };
+        } else if (this.activeTool === 'x') {
+          return this.xOrientation === 'horizontal' ? { w: this.X_UNITS, h: 1 } : { w: 1, h: this.X_UNITS };
+        } else if (this.activeTool === 'unit') {
+          return { w: 1, h: 1 };
+        }
+        return { w: 0, h: 0 };
+      },
+
+      canPlaceAt(r, c, w, h) {
+        if (r + h > this.GRID_ROWS || c + w > this.GRID_COLS) return false;
+        for (let row = r; row < r + h; row++) {
+          for (let col = c; col < c + w; col++) {
+            if (this.occupancyGrid[row][col] !== null) return false;
+          }
+        }
+        return true;
+      },
+
+      handleCellHover(r, c) {
+        this.clearHoverPreview();
+        if (this.activeTool === 'eraser') return;
+
+        const { w, h } = this.getToolDimensions();
+        const valid = this.canPlaceAt(r, c, w, h);
+        const gridCells = document.querySelectorAll('.snap-board-cell');
+
+        for (let row = r; row < r + h && row < this.GRID_ROWS; row++) {
+          for (let col = c; col < c + w && col < this.GRID_COLS; col++) {
+            const idx = row * this.GRID_COLS + col;
+            if (gridCells[idx]) {
+              gridCells[idx].classList.add(valid ? 'preview-hover' : 'preview-invalid');
+            }
+          }
+        }
+      },
+
+      clearHoverPreview() {
+        const gridCells = document.querySelectorAll('.snap-board-cell');
+        gridCells.forEach(cell => {
+          cell.classList.remove('preview-hover', 'preview-invalid');
+        });
+      },
+
+      handleGridClick(r, c) {
+        const existingPieceId = this.occupancyGrid[r][c];
+        if (existingPieceId !== null) {
+          this.removePiece(existingPieceId);
+          return;
+        }
+
+        if (this.activeTool === 'eraser') return;
+
+        const usedX2 = this.placedPieces.filter(p => p.type === 'x2').length;
+        const usedX = this.placedPieces.filter(p => p.type === 'x').length;
+        const used1 = this.placedPieces.filter(p => p.type === 'unit').length;
+
+        if (this.activeTool === 'x2' && usedX2 >= this.reqX2) {
+          Sound.playWrong();
+          App.showToast('x² 積木已全數用完！', '⚠️');
+          return;
+        }
+        if (this.activeTool === 'x' && usedX >= this.reqX) {
+          Sound.playWrong();
+          App.showToast('x 長條已全數用完！', '⚠️');
+          return;
+        }
+        if (this.activeTool === 'unit' && used1 >= this.reqUnit) {
+          Sound.playWrong();
+          App.showToast('單位 1 小方塊已全數用完！', '⚠️');
+          return;
+        }
+
+        const { w, h } = this.getToolDimensions();
+        if (!this.canPlaceAt(r, c, w, h)) {
+          Sound.playWrong();
+          App.showToast('位置超出邊界或與其他積木重疊！', '❌');
+          return;
+        }
+
+        Sound.playSnap();
+        const newPiece = {
+          id: this.nextPieceId++,
+          type: this.activeTool,
+          orientation: this.xOrientation,
+          r, c, w, h
+        };
+
+        for (let row = r; row < r + h; row++) {
+          for (let col = c; col < c + w; col++) {
+            this.occupancyGrid[row][col] = newPiece.id;
+          }
+        }
+
+        this.placedPieces.push(newPiece);
+        this.clearHoverPreview();
+        this.renderSandboxBoard();
+        this.updateInventoryUI();
+      },
+
+      removePiece(pieceId) {
+        Sound.playClick();
+        const piece = this.placedPieces.find(p => p.id === pieceId);
+        if (!piece) return;
+
+        for (let row = piece.r; row < piece.r + piece.h; row++) {
+          for (let col = piece.c; col < piece.c + piece.w; col++) {
+            this.occupancyGrid[row][col] = null;
+          }
+        }
+
+        this.placedPieces = this.placedPieces.filter(p => p.id !== pieceId);
+        this.renderSandboxBoard();
+        this.updateInventoryUI();
+        document.getElementById('boardTopBracket').classList.add('opacity-0');
+        document.getElementById('boardLeftBracket').classList.add('opacity-0');
+      },
+
+      giveHint() {
+        Sound.playClick();
+        const cur = this.levels[this.currentIdx];
+        App.showToast(`提示：試著將 ${cur.a + cur.b} 個長條 x，拆成 ${cur.a} 條橫向與 ${cur.b} 條直向！`, '💡');
+      },
+
+      checkRectangle() {
+        const usedX2 = this.placedPieces.filter(p => p.type === 'x2').length;
+        const usedX = this.placedPieces.filter(p => p.type === 'x').length;
+        const used1 = this.placedPieces.filter(p => p.type === 'unit').length;
+
+        if (usedX2 < this.reqX2 || usedX < this.reqX || used1 < this.reqUnit) {
+          Sound.playWrong();
+          const missing = [];
+          if (usedX2 < this.reqX2) missing.push(`x² 剩 ${this.reqX2 - usedX2} 個`);
+          if (usedX < this.reqX) missing.push(`x 剩 ${this.reqX - usedX} 個`);
+          if (used1 < this.reqUnit) missing.push(`1 剩 ${this.reqUnit - used1} 個`);
+          App.showToast(`積木還沒用完喔！（${missing.join('、')}）`, '⚠️');
+          return;
+        }
+
+        let minR = this.GRID_ROWS, maxR = -1;
+        let minC = this.GRID_COLS, maxC = -1;
+        let occupiedCellCount = 0;
+
+        for (let r = 0; r < this.GRID_ROWS; r++) {
+          for (let c = 0; c < this.GRID_COLS; c++) {
+            if (this.occupancyGrid[r][c] !== null) {
+              occupiedCellCount++;
+              if (r < minR) minR = r;
+              if (r > maxR) maxR = r;
+              if (c < minC) minC = c;
+              if (c > maxC) maxC = c;
+            }
+          }
+        }
+
+        if (occupiedCellCount === 0) {
+          Sound.playWrong();
+          App.showToast('工作台上空空如也，請先擺放積木！', '⚠️');
+          return;
+        }
+
+        const boxHeight = maxR - minR + 1;
+        const boxWidth = maxC - minC + 1;
+        const boxArea = boxHeight * boxWidth;
+
+        if (boxArea !== occupiedCellCount) {
+          Sound.playWrong();
+          const boardCard = document.getElementById('sandboxGrid');
+          boardCard.classList.add('shake-anim');
+          setTimeout(() => boardCard.classList.remove('shake-anim'), 400);
+          App.showToast('形狀邊緣有缺角或內部留有空隙！必須是實心大長方形！', '❌');
+          return;
+        }
+
+        const cur = this.levels[this.currentIdx];
+        const dim1 = this.X_UNITS + cur.a;
+        const dim2 = this.X_UNITS + cur.b;
+
+        const isMatchStandard = (boxWidth === dim1 && boxHeight === dim2) || (boxWidth === dim2 && boxHeight === dim1);
+
+        if (!isMatchStandard) {
+          Sound.playWrong();
+          App.showToast('雖然是長方形，但因式邊長不符合代數結構！請確認長條與方塊的排列！', '⚠️');
+          return;
+        }
+
+        Sound.playSuccess();
+        const topLengthText = boxWidth === dim1 ? `長度 = (x + ${cur.a})` : `長度 = (x + ${cur.b})`;
+        const leftWidthText = boxHeight === dim1 ? `寬度 = (x + ${cur.a})` : `寬度 = (x + ${cur.b})`;
+
+        const topBracket = document.getElementById('boardTopBracket');
+        const leftBracket = document.getElementById('boardLeftBracket');
+        topBracket.textContent = topLengthText;
+        leftBracket.textContent = leftWidthText;
+        topBracket.classList.remove('opacity-0');
+        leftBracket.classList.remove('opacity-0');
+
+        document.getElementById('tileFactorResult').textContent = cur.factorText;
+        document.getElementById('tileSuccessBanner').classList.remove('hidden');
+        document.getElementById('placementStatusText').textContent = `🎉 恭喜！成功以幾何面積證明 ${cur.poly} = ${cur.factorText}！`;
+
+        const nextUnlock = Math.max(cur.level + 1, parseInt(localStorage.getItem('fa_tile_level') || '1', 10));
+        localStorage.setItem('fa_tile_level', nextUnlock);
+        App.loadStats();
+
+        App.showToast(`太棒了！成功拼成大長方形：${cur.factorText}！`, '🎉');
+      },
+
+      nextLevel() {
+        Sound.playClick();
+        this.currentIdx = (this.currentIdx + 1) % this.levels.length;
+        this.loadLevel();
+      },
+
+      prevLevel() {
+        Sound.playClick();
+        this.currentIdx = (this.currentIdx - 1 + this.levels.length) % this.levels.length;
+        this.loadLevel();
+      }
+    };
+
+    const CrossGame = {
+      // 題庫涵蓋：常數異號、首項 a>1 交叉考驗、多因數拆法陷阱
+      bank: [
+        { 
+          poly: "x² - 5x - 24", a: 1, b: -5, c: -24,
+          headOptions: [ { a1: 1, a2: 1 } ],
+          // 陷阱拆法包括和為 -2, +2, +5, -10 等
+          tailOptions: [
+            { c1: 1, c2: -24 }, { c1: -1, c2: 24 },
+            { c1: 2, c2: -12 }, { c1: -2, c2: 12 },
+            { c1: 3, c2: -8 },  { c1: -3, c2: 8 },  // 3 + (-8) = -5 正解
+            { c1: 4, c2: -6 },  { c1: -4, c2: 6 }
+          ],
+          tip: "常數是 -24 (一正一負)，兩數相加要等於 -5，負數的絕對值較大！"
+        },
+        { 
+          poly: "x² + 7x + 12", a: 1, b: 7, c: 12,
+          headOptions: [ { a1: 1, a2: 1 } ],
+          tailOptions: [
+            { c1: 1, c2: 12 }, { c1: -1, c2: -12 },
+            { c1: 2, c2: 6 },  { c1: -2, c2: -6 },
+            { c1: 3, c2: 4 },  { c1: -3, c2: -4 }   // 3 + 4 = 7 正解
+          ],
+          tip: "常數是 +12，一次項為 +7，兩數同正號！"
+        },
+        { 
+          poly: "x² - 9x + 20", a: 1, b: -9, c: 20,
+          headOptions: [ { a1: 1, a2: 1 } ],
+          tailOptions: [
+            { c1: 1, c2: 20 },  { c1: -1, c2: -20 },
+            { c1: 2, c2: 10 },  { c1: -2, c2: -10 },
+            { c1: 4, c2: 5 },   { c1: -4, c2: -5 }  // -4 + (-5) = -9 正解
+          ],
+          tip: "常數是 +20，但一次項是 -9，代表兩數皆為負數！"
+        },
+        { 
+          poly: "x² + 2x - 15", a: 1, b: 2, c: -15,
+          headOptions: [ { a1: 1, a2: 1 } ],
+          tailOptions: [
+            { c1: 1, c2: -15 }, { c1: -1, c2: 15 },
+            { c1: 3, c2: -5 },  { c1: -3, c2: 5 }   // -3 + 5 = 2 正解
+          ],
+          tip: "兩數相乘為 -15，相加為 +2，正數絕對值比負數大 2。"
+        },
+        { 
+          poly: "2x² + 7x + 3", a: 2, b: 7, c: 3,
+          // 首項拆法有兩種配對方式，考驗交叉相乘
+          headOptions: [
+            { a1: 2, a2: 1 },
+            { a1: 1, a2: 2 }
+          ],
+          tailOptions: [
+            { c1: 1, c2: 3 },  // (2*3) + (1*1) = 7 正解
+            { c1: 3, c2: 1 },  // (2*1) + (1*3) = 5 陷阱
+            { c1: -1, c2: -3 },
+            { c1: -3, c2: -1 }
+          ],
+          tip: "首項是 2x·x，注意 2x 要乘到 3 才能湊出 6x + 1x = 7x！"
+        },
+        { 
+          poly: "2x² - 5x - 3", a: 2, b: -5, c: -3,
+          headOptions: [
+            { a1: 2, a2: 1 },
+            { a1: 1, a2: 2 }
+          ],
+          tailOptions: [
+            { c1: 1, c2: -3 }, // (2*-3) + (1*1) = -5 正解
+            { c1: -1, c2: 3 },
+            { c1: 3, c2: -1 },
+            { c1: -3, c2: 1 }
+          ],
+          tip: "2x 乘上 -3 得到 -6x，再加 1x 就會是 -5x！"
+        }
+      ],
+
+      mode: 'puzzle', // 'puzzle' or 'speed'
+      puzzleStage: 0,
+      lives: 3,
+      score: 0,
+      timeLeft: 60,
+      timerInterval: null,
+      currentQ: null,
+      
+      headIdx: 0,
+      tailIdx: 0,
+
+      init() {
+        this.score = 0;
+        document.getElementById('crossScore').textContent = this.score;
+        this.setMode('puzzle');
+      },
+
+      setMode(mode) {
+        this.mode = mode;
+        const btnPuzzle = document.getElementById('btnCrossModePuzzle');
+        const btnSpeed = document.getElementById('btnCrossModeSpeed');
+        const statusBox = document.getElementById('crossStatusBox');
+        
+        if (this.timerInterval) clearInterval(this.timerInterval);
+
+        if (mode === 'puzzle') {
+          btnPuzzle.className = "px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-amber-500 text-slate-950 shadow transition";
+          btnSpeed.className = "px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 transition";
+          this.lives = 3;
+          this.puzzleStage = 0;
+          this.updateLivesUI();
+          this.loadPuzzleQuestion();
+        } else {
+          btnSpeed.className = "px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-amber-500 text-slate-950 shadow transition";
+          btnPuzzle.className = "px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 transition";
+          this.timeLeft = 60;
+          statusBox.innerHTML = `<span>倒數：</span><span id="crossSpeedTimer" class="mono-font text-amber-300 font-black">60s</span>`;
+          this.startSpeedTimer();
+          this.loadRandomQuestion();
+        }
+      },
+
+      updateLivesUI() {
+        const hearts = "❤️".repeat(Math.max(0, this.lives)) + "🖤".repeat(Math.max(0, 3 - this.lives));
+        document.getElementById('crossStatusBox').innerHTML = `<span>生命：</span><span class="text-base">${hearts}</span>`;
+      },
+
+      startSpeedTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+          this.timeLeft--;
+          const timerEl = document.getElementById('crossSpeedTimer');
+          if (timerEl) timerEl.textContent = `${this.timeLeft}s`;
+
+          if (this.timeLeft <= 0) {
+            clearInterval(this.timerInterval);
+            Sound.playWrong();
+            App.showToast(`時間到！極速衝刺得分：${this.score} 分`, '🏁');
+            const best = Math.max(this.score, parseInt(localStorage.getItem('fa_cross_score') || '0', 10));
+            localStorage.setItem('fa_cross_score', best);
+            App.loadStats();
+          }
+        }, 1000);
+      },
+
+      loadPuzzleQuestion() {
+        this.currentQ = this.bank[this.puzzleStage % this.bank.length];
+        document.getElementById('crossProgressBadge').textContent = `第 ${this.puzzleStage + 1} / 5 關`;
+        this.setupQuestionUI();
+      },
+
+      loadRandomQuestion() {
+        this.currentQ = this.bank[Math.floor(Math.random() * this.bank.length)];
+        document.getElementById('crossProgressBadge').textContent = `極速挑戰中`;
+        this.setupQuestionUI();
+      },
+
+      setupQuestionUI() {
+        document.getElementById('crossTargetPoly').textContent = this.currentQ.poly;
+        document.getElementById('crossFeedbackBox').classList.add('hidden');
+        document.getElementById('lockStatusIcon').textContent = '🔒';
+
+        // 亂數洗牌轉盤起始位置，避免剛好停在正解
+        this.headIdx = Math.floor(Math.random() * this.currentQ.headOptions.length);
+        this.tailIdx = Math.floor(Math.random() * this.currentQ.tailOptions.length);
+        
+        this.renderDialValues();
+      },
+
+      stepHead(item, delta) {
+        Sound.playRotate();
+        const total = this.currentQ.headOptions.length;
+        this.headIdx = (this.headIdx + delta + total) % total;
+        this.renderDialValues();
+        document.getElementById('crossFeedbackBox').classList.add('hidden');
+      },
+
+      stepTail(item, delta) {
+        Sound.playRotate();
+        const total = this.currentQ.tailOptions.length;
+        this.tailIdx = (this.tailIdx + delta + total) % total;
+        this.renderDialValues();
+        document.getElementById('crossFeedbackBox').classList.add('hidden');
+      },
+
+      renderDialValues() {
+        const curHead = this.currentQ.headOptions[this.headIdx];
+        const curTail = this.currentQ.tailOptions[this.tailIdx];
+
+        const formatHead = (c) => c === 1 ? 'x' : `${c}x`;
+        const formatTail = (n) => n >= 0 ? `+${n}` : `${n}`;
+
+        document.getElementById('termA1').textContent = formatHead(curHead.a1);
+        document.getElementById('termA2').textContent = formatHead(curHead.a2);
+        document.getElementById('termC1').textContent = formatTail(curTail.c1);
+        document.getElementById('termC2').textContent = formatTail(curTail.c2);
+      },
+
+      verify() {
+        const curHead = this.currentQ.headOptions[this.headIdx];
+        const curTail = this.currentQ.tailOptions[this.tailIdx];
+
+        // 計算十字交叉相乘和： (a1 * c2) + (a2 * c1)
+        const prod1 = curHead.a1 * curTail.c2;
+        const prod2 = curHead.a2 * curTail.c1;
+        const studentSum = prod1 + prod2;
+        const targetB = this.currentQ.b;
+
+        const fbBox = document.getElementById('crossFeedbackBox');
+        const fb1 = document.getElementById('feedbackText1');
+        const fb2 = document.getElementById('feedbackText2');
+        fbBox.classList.remove('hidden');
+
+        if (studentSum === targetB) {
+          // 答對！
+          Sound.playSuccess();
+          document.getElementById('lockStatusIcon').textContent = '🔓';
+          fb1.textContent = `交叉和：${prod1}x + (${prod2}x) = ${studentSum}x`;
+          fb2.textContent = `✅ 吻合目標！成功解開密碼鎖！`;
+          fb2.className = "font-bold text-emerald-400 mt-0.5";
+
+          if (this.mode === 'puzzle') {
+            this.score += 25;
+            document.getElementById('crossScore').textContent = this.score;
+            this.puzzleStage++;
+            if (this.puzzleStage >= 5) {
+              App.showToast(`🏆 恭喜通關！全數破解十字交乘密碼盤！`, '🎉');
+              const best = Math.max(this.score, parseInt(localStorage.getItem('fa_cross_score') || '0', 10));
+              localStorage.setItem('fa_cross_score', best);
+              App.loadStats();
+              setTimeout(() => this.setMode('puzzle'), 1200);
+              return;
+            } else {
+              App.showToast(`解鎖成功！進入下一關`, '🔓');
+              setTimeout(() => this.loadPuzzleQuestion(), 900);
+            }
+          } else {
+            // 極速模式加分與加秒
+            this.score += 20;
+            this.timeLeft += 6;
+            document.getElementById('crossScore').textContent = this.score;
+            App.showToast(`答對！+20分、時間+6秒！`, '⚡');
+            setTimeout(() => this.loadRandomQuestion(), 700);
+          }
+
+        } else {
+          // 答錯！給予明確心算診斷
+          Sound.playWrong();
+          document.getElementById('lockStatusIcon').textContent = '❌';
+          
+          const btn = document.getElementById('crossVerifyBtn');
+          btn.classList.add('shake-anim');
+          setTimeout(() => btn.classList.remove('shake-anim'), 400);
+
+          fb1.textContent = `目前交叉和：${prod1}x + (${prod2}x) = ${studentSum}x`;
+          fb2.textContent = `❌ 與目標 (${targetB}x) 不符！差了 ${studentSum - targetB > 0 ? '+' : ''}${studentSum - targetB}x`;
+          fb2.className = "font-bold text-rose-400 mt-0.5";
+
+          if (this.mode === 'puzzle') {
+            this.lives--;
+            this.updateLivesUI();
+            if (this.lives <= 0) {
+              App.showToast(`生命值耗盡！密碼鎖重置！`, '💀');
+              setTimeout(() => this.setMode('puzzle'), 1200);
+            } else {
+              App.showToast(`心算不符合！扣除 1 點生命`, '⚠️');
+            }
+          } else {
+            // 極速模式答錯扣 5 秒
+            this.timeLeft = Math.max(0, this.timeLeft - 5);
+            App.showToast(`算錯囉！懲罰扣 5 秒！`, '💥');
+          }
+        }
+      },
+
+      skipOrGiveHint() {
+        Sound.playClick();
+        if (this.currentQ && this.currentQ.tip) {
+          App.showToast(`心算提點：${this.currentQ.tip}`, '💡');
+        }
+      }
+    };
+
+    const BubbleGame = {
+      rounds: [
+        { poly: "x² - 9", f1: "(x - 3)", f2: "(x + 3)", dist: ["(x - 9)", "(x + 9)", "(x - 1)", "(x + 1)"] },
+        { poly: "x² - 16", f1: "(x - 4)", f2: "(x + 4)", dist: ["(x - 8)", "(x + 8)", "(x - 2)", "(x + 2)"] },
+        { poly: "x² - x - 6", f1: "(x - 3)", f2: "(x + 2)", dist: ["(x + 3)", "(x - 2)", "(x - 6)", "(x + 1)"] },
+        { poly: "x² + 5x + 6", f1: "(x + 2)", f2: "(x + 3)", dist: ["(x - 2)", "(x - 3)", "(x + 6)", "(x + 1)"] },
+        { poly: "x² - 7x + 10", f1: "(x - 2)", f2: "(x - 5)", dist: ["(x + 2)", "(x + 5)", "(x - 10)", "(x - 1)"] },
+        { poly: "x² + 3x - 10", f1: "(x + 5)", f2: "(x - 2)", dist: ["(x - 5)", "(x + 2)", "(x + 10)", "(x - 1)"] },
+        { poly: "2x² + 5x + 2", f1: "(2x + 1)", f2: "(x + 2)", dist: ["(2x + 2)", "(x + 1)", "(2x - 1)", "(x - 2)"] }
+      ],
+      currentRound: null,
+      selectedBubbles: [],
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+
+      init() {
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = parseInt(localStorage.getItem('fa_bubble_combo') || '0', 10);
+        document.getElementById('bubbleScore').textContent = this.score;
+        document.getElementById('bubbleComboText').textContent = this.combo;
+        this.initRound();
+      },
+
+      initRound() {
+        this.selectedBubbles = [];
+        this.updateSelectionDisplay();
+        
+        this.currentRound = this.rounds[Math.floor(Math.random() * this.rounds.length)];
+        document.getElementById('bubbleTargetPoly').textContent = this.currentRound.poly;
+
+        let bubbleList = [
+          { text: this.currentRound.f1, isTarget: true, id: 1 },
+          { text: this.currentRound.f2, isTarget: true, id: 2 }
+        ];
+
+        this.currentRound.dist.forEach((d, idx) => {
+          bubbleList.push({ text: d, isTarget: false, id: 10 + idx });
+        });
+
+        bubbleList.sort(() => Math.random() - 0.5);
+        this.renderBubbles(bubbleList);
+      },
+
+      renderBubbles(list) {
+        const field = document.getElementById('bubbleField');
+        field.innerHTML = '';
+
+        const colors = [
+          'from-cyan-500 to-blue-600',
+          'from-teal-400 to-emerald-600',
+          'from-indigo-500 to-purple-600',
+          'from-pink-500 to-rose-600',
+          'from-amber-400 to-orange-500'
+        ];
+
+        list.forEach((item, i) => {
+          const bubble = document.createElement('div');
+          const colGrad = colors[i % colors.length];
+          bubble.className = `bubble-float cursor-pointer w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br ${colGrad} p-1 shadow-xl flex items-center justify-center text-center font-black text-white text-base md:text-lg border-2 border-white/40 active:scale-90 transition-transform select-none`;
+          bubble.innerHTML = `<span class="drop-shadow math-font">${item.text}</span>`;
+          
+          bubble.onclick = () => this.handleBubbleClick(item, bubble);
+          field.appendChild(bubble);
+        });
+      },
+
+      handleBubbleClick(item, el) {
+        Sound.playPop();
+
+        const existIdx = this.selectedBubbles.findIndex(b => b.el === el);
+        if (existIdx >= 0) {
+          this.selectedBubbles.splice(existIdx, 1);
+          el.classList.remove('ring-4', 'ring-yellow-300', 'scale-105');
+          this.updateSelectionDisplay();
+          return;
+        }
+
+        if (this.selectedBubbles.length < 2) {
+          this.selectedBubbles.push({ data: item, el: el });
+          el.classList.add('ring-4', 'ring-yellow-300', 'scale-105');
+          this.updateSelectionDisplay();
+
+          if (this.selectedBubbles.length === 2) {
+            this.checkMatch();
+          }
+        }
+      },
+
+      updateSelectionDisplay() {
+        const b1 = this.selectedBubbles[0] ? this.selectedBubbles[0].data.text : "無";
+        const b2 = this.selectedBubbles[1] ? this.selectedBubbles[1].data.text : "無";
+        document.getElementById('selectedBubble1').textContent = b1;
+        document.getElementById('selectedBubble2').textContent = b2;
+      },
+
+      checkMatch() {
+        const b1 = this.selectedBubbles[0].data;
+        const b2 = this.selectedBubbles[1].data;
+
+        const isB1Correct = (b1.text === this.currentRound.f1 || b1.text === this.currentRound.f2);
+        const isB2Correct = (b2.text === this.currentRound.f1 || b2.text === this.currentRound.f2);
+        const isDifferent = (b1.id !== b2.id);
+
+        if (isB1Correct && isB2Correct && isDifferent) {
+          Sound.playSuccess();
+          this.combo++;
+          this.score += 15 * this.combo;
+          if (this.combo > this.maxCombo) {
+            this.maxCombo = this.combo;
+            localStorage.setItem('fa_bubble_combo', this.maxCombo);
+          }
+
+          document.getElementById('bubbleScore').textContent = this.score;
+          document.getElementById('bubbleComboText').textContent = this.combo;
+          App.showToast(`配對成功！${b1.text}${b2.text} 連擊 ${this.combo} Combo！`, '💥');
+
+          this.selectedBubbles.forEach(b => {
+            b.el.style.transform = 'scale(0)';
+            b.el.style.opacity = '0';
+          });
+
+          setTimeout(() => {
+            this.initRound();
+          }, 650);
+        } else {
+          Sound.playWrong();
+          this.combo = 0;
+          document.getElementById('bubbleComboText').textContent = this.combo;
+          App.showToast(`因式組合不正確，Combo 重置！`, '💔');
+
+          this.selectedBubbles.forEach(b => {
+            b.el.classList.remove('ring-4', 'ring-yellow-300', 'scale-105');
+            b.el.classList.add('shake-anim');
+            setTimeout(() => b.el.classList.remove('shake-anim'), 400);
+          });
+
+          this.selectedBubbles = [];
+          this.updateSelectionDisplay();
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      App.init();
+    });
+  </script>
+</body>
+</html>
